@@ -56,12 +56,99 @@
                     <label class="text-textMedium mb-1">辅导员姓名</label>
                     <input type="text" name="counselor" class="border border-gray-300 rounded-lg px-3 py-2" required>
                 </div>
+                <div class="flex flex-col">
+                    <label class="text-textMedium mb-1">手写签字</label>
+                    <div class="border border-gray-300 rounded-lg p-2">
+                        <canvas id="signatureCanvas" width="300" height="150" class="border border-gray-200"></canvas>
+                        <div class="flex justify-between mt-2">
+                            <button type="button" id="clearSignature" class="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">清除</button>
+                        </div>
+                    </div>
+                </div>
                 <button type="submit" class="bg-primary text-white rounded-lg py-2 px-4 w-full font-medium">保存并提交</button>
             </form>
         </section>
     </main>
     <script>
+        // 手写签字功能
+        let signatureCanvas = null;
+        let ctx = null;
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        function initSignature() {
+            signatureCanvas = document.getElementById('signatureCanvas');
+            if (!signatureCanvas) return;
+            
+            ctx = signatureCanvas.getContext('2d');
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#000';
+
+            signatureCanvas.addEventListener('mousedown', startDrawing);
+            signatureCanvas.addEventListener('mousemove', draw);
+            signatureCanvas.addEventListener('mouseup', stopDrawing);
+            signatureCanvas.addEventListener('mouseout', stopDrawing);
+
+            // 触摸事件支持
+            signatureCanvas.addEventListener('touchstart', startDrawingTouch);
+            signatureCanvas.addEventListener('touchmove', drawTouch);
+            signatureCanvas.addEventListener('touchend', stopDrawing);
+
+            document.getElementById('clearSignature').addEventListener('click', clearSignature);
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        }
+
+        function startDrawingTouch(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = signatureCanvas.getBoundingClientRect();
+            lastX = touch.clientX - rect.left;
+            lastY = touch.clientY - rect.top;
+            isDrawing = true;
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke();
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        }
+
+        function drawTouch(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = signatureCanvas.getBoundingClientRect();
+            const currentX = touch.clientX - rect.left;
+            const currentY = touch.clientY - rect.top;
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+            
+            [lastX, lastY] = [currentX, currentY];
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            initSignature();
             const leaveData = JSON.parse(localStorage.getItem('leaveData'));
             if(leaveData) {
                 document.querySelector('input[name="name"]').value = leaveData.name || '';
@@ -82,6 +169,12 @@
             const formData = new FormData(this);
             const data = {};
             const images = [];
+            
+            // 获取签名数据
+            if (signatureCanvas) {
+                data.signature = signatureCanvas.toDataURL('image/png');
+            }
+            
             Array.from(formData.getAll('evidence')).forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function() {
@@ -96,6 +189,15 @@
                 };
                 reader.readAsDataURL(file);
             });
+            
+            // 如果没有上传文件，直接保存数据
+            if (formData.getAll('evidence').length === 0) {
+                formData.forEach((value, key) => {
+                    data[key] = value;
+                });
+                localStorage.setItem('leaveData', JSON.stringify(data));
+                window.location.href = 'yiban前端1.html';
+            }
         });
     </script>
 </body>
